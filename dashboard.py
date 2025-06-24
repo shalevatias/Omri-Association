@@ -61,6 +61,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add success message function
+def show_success_message(message):
+    """Show a success message with custom styling"""
+    st.markdown(f"""
+    <div style="
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 10px 0;
+        color: #155724;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span style="font-size: 18px;">✅</span>
+        {message}
+    </div>
+    """, unsafe_allow_html=True)
+
 # Add custom CSS for RTL support and styling
 st.markdown("""
     <style>
@@ -465,6 +486,9 @@ def main():
             st.error("לא ניתן להמשיך ללא נתונים תקינים")
             return
         
+        # Show success message for data loading
+        show_success_message("הנתונים נטענו בהצלחה!")
+        
         # Calculate statistics for alerts
         budget_status = calculate_monthly_budget(expenses_df, donations_df)
         donor_stats = calculate_donor_statistics(donations_df)
@@ -517,6 +541,7 @@ def main():
                 if st.button("📊 דוח חודשי", use_container_width=True):
                     filename = generate_monthly_report(expenses_df, donations_df, almanot_df)
                     if filename:
+                        show_success_message("דוח חודשי נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח חודשי",
@@ -528,6 +553,7 @@ def main():
                 if st.button("👥 דוח תורמים", use_container_width=True):
                     filename = generate_donor_report(donations_df)
                     if filename:
+                        show_success_message("דוח תורמים נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח תורמים",
@@ -539,6 +565,7 @@ def main():
                 if st.button("👩 דוח אלמנות", use_container_width=True):
                     filename = generate_widows_report(almanot_df)
                     if filename:
+                        show_success_message("דוח אלמנות נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח אלמנות",
@@ -550,6 +577,7 @@ def main():
                 if st.button("💰 דוח תקציב", use_container_width=True):
                     filename = generate_budget_report(expenses_df, donations_df)
                     if filename:
+                        show_success_message("דוח תקציב נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח תקציב",
@@ -1231,6 +1259,7 @@ def main():
                 if st.button("📊 דוח חודשי מלא", use_container_width=True):
                     filename = generate_monthly_report(expenses_df, donations_df, almanot_df)
                     if filename:
+                        show_success_message("דוח חודשי מלא נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח חודשי",
@@ -1242,6 +1271,7 @@ def main():
                 if st.button("👥 דוח תורמים מפורט", use_container_width=True):
                     filename = generate_donor_report(donations_df)
                     if filename:
+                        show_success_message("דוח תורמים מפורט נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח תורמים",
@@ -1253,6 +1283,7 @@ def main():
                 if st.button("👩 דוח אלמנות מפורט", use_container_width=True):
                     filename = generate_widows_report(almanot_df)
                     if filename:
+                        show_success_message("דוח אלמנות מפורט נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח אלמנות",
@@ -1264,6 +1295,7 @@ def main():
                 if st.button("💰 דוח תקציב מפורט", use_container_width=True):
                     filename = generate_budget_report(expenses_df, donations_df)
                     if filename:
+                        show_success_message("דוח תקציב מפורט נוצר בהצלחה!")
                         with open(filename, "rb") as file:
                             st.download_button(
                                 label="הורד דוח תקציב",
@@ -1320,6 +1352,7 @@ def main():
                     filename = generate_budget_report(filtered_expenses, filtered_donations)
                 
                 if filename:
+                    show_success_message(f"{report_type} נוצר בהצלחה!")
                     with open(filename, "rb") as file:
                         st.download_button(
                             label=f"הורד {report_type}",
