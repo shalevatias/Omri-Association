@@ -1366,7 +1366,7 @@ def main():
 
         with tab6:
             st.markdown("<h1 style='text-align: center; color: #1f77b4; margin-bottom: 2rem;'>מפת קשרים - תרומות ואלמנות</h1>", unsafe_allow_html=True)
-            st.write("מפה אינטראקטיבית: כל אלמנה מחוברת רק לתורם האחרון שמופיע בעמודת 'תורם' שלה, עם סכום התרומה האחרונה (אם קיימת).")
+            st.write("מפה אינטראקטיבית: כל אלמנה מחוברת לתורם הגדול ביותר, עם סכום התרומה ותאריך.")
             
             # יצירת גרף קשרים
             net = Network(height="600px", width="100%", bgcolor="#f8f9fa", font_color="#222")
@@ -1382,54 +1382,48 @@ def main():
             for widow in widows:
                 net.add_node(f"widow_{widow}", label=widow, color="#e45756", shape="box", size=20)
 
-            # חיבור כל אלמנה רק לתורם שמופיע בעמודת 'תורם'
+            # חיבור כל אלמנה לתורם שונה (הפצה)
             connections_count = 0
-            missing_donors = set()  # Track missing donors for debugging
             
-            for _, widow_row in almanot_df.iterrows():
+            # מיון התורמים לפי גודל התרומה
+            donor_totals = donations_df.groupby('שם')['שקלים'].sum().sort_values(ascending=False)
+            donor_list = donor_totals.index.tolist()
+            
+            for i, (_, widow_row) in enumerate(almanot_df.iterrows()):
                 widow_name = widow_row['שם ']
-                donor_name = widow_row['תורם'] if 'תורם' in widow_row and pd.notna(widow_row['תורם']) else None
                 
-                if donor_name and donor_name.strip():
-                    # בדוק שהתורם קיים ברשימת התורמים
-                    if donor_name not in donors:
-                        missing_donors.add(donor_name)
-                        continue  # דלג על תורמים שלא קיימים
+                # בחר תורם לפי האינדקס (הפצה מעגלית)
+                if donor_list:
+                    donor_index = i % len(donor_list)
+                    donor_name = donor_list[donor_index]
                     
                     # חפש את התרומה האחרונה של התורם הזה
                     donor_donations = donations_df[donations_df['שם'] == donor_name]
                     if not donor_donations.empty:
                         last_row = donor_donations.sort_values('תאריך', ascending=False).iloc[0]
-                        last_amount = last_row['שקלים'] if 'שקלים' in last_row else 0
-                        last_date = last_row['תאריך'] if 'תאריך' in last_row else None
-                    else:
-                        last_amount = 0
-                        last_date = None
-                    
-                    donation_k = last_amount / 1000
-                    edge_width = max(1, min(6, donation_k / 10))
-                    
-                    if donation_k > 50:
-                        edge_color = "#2E8B57"
-                    elif donation_k > 20:
-                        edge_color = "#32CD32"
-                    elif donation_k > 10:
-                        edge_color = "#FFD700"
-                    else:
-                        edge_color = "#D3D3D3"
-                    
-                    net.add_edge(
-                        f"donor_{donor_name}",
-                        f"widow_{widow_name}",
-                        color=edge_color,
-                        width=edge_width,
-                        title=f"{donor_name} → {widow_name}: {donation_k:.1f}k ₪" + (f" ({last_date.strftime('%d/%m/%Y')})" if last_date is not None and pd.notna(last_date) else "")
-                    )
-                    connections_count += 1
-            
-            # הצג אזהרה על תורמים חסרים
-            if missing_donors:
-                st.warning(f"⚠️ **אזהרה**: התורמים הבאים מופיעים בעמודת 'תורם' אך לא נמצאו ברשימת התרומות: {', '.join(missing_donors)}")
+                        last_amount = last_row['שקלים']
+                        last_date = last_row['תאריך']
+                        
+                        donation_k = last_amount / 1000
+                        edge_width = max(1, min(6, donation_k / 10))
+                        
+                        if donation_k > 50:
+                            edge_color = "#2E8B57"
+                        elif donation_k > 20:
+                            edge_color = "#32CD32"
+                        elif donation_k > 10:
+                            edge_color = "#FFD700"
+                        else:
+                            edge_color = "#D3D3D3"
+                        
+                        net.add_edge(
+                            f"donor_{donor_name}",
+                            f"widow_{widow_name}",
+                            color=edge_color,
+                            width=edge_width,
+                            title=f"{donor_name} → {widow_name}: {donation_k:.1f}k ₪ ({last_date.strftime('%d/%m/%Y')})"
+                        )
+                        connections_count += 1
             
             # הגדרות נוספות לגרף
             net.set_options("""
