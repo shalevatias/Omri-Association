@@ -1,3 +1,9 @@
-pandas
-streamlit
-openpyxl 
+streamlit>=1.28.0
+pandas>=2.0.0
+plotly>=5.15.0
+openpyxl>=3.1.0
+fpdf>=1.7.2
+numpy
+Pillow
+arabic-reshaper
+python-bidi 
