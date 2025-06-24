@@ -63,23 +63,26 @@ st.set_page_config(
 
 # Add success message function
 def show_success_message(message):
-    """Show a success message with custom styling"""
+    """Show a success message with custom styling that auto-dismisses after 3 seconds"""
+    # Create a placeholder for the message
+    message_placeholder = st.empty()
+    
+    # Show the message
+    message_placeholder.success(f"✅ {message}")
+    
+    # Auto-dismiss after 3 seconds using JavaScript
     st.markdown(f"""
-    <div style="
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin: 10px 0;
-        color: #155724;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    ">
-        <span style="font-size: 18px;">✅</span>
-        {message}
-    </div>
+    <script>
+    setTimeout(function() {{
+        // Find and hide the success message
+        var successElements = document.querySelectorAll('.stAlert');
+        successElements.forEach(function(element) {{
+            if (element.textContent.includes('{message}')) {{
+                element.style.display = 'none';
+            }}
+        }});
+    }}, 3000);
+    </script>
     """, unsafe_allow_html=True)
 
 # Add custom CSS for RTL support and styling
@@ -1363,7 +1366,7 @@ def main():
 
         with tab6:
             st.markdown("<h1 style='text-align: center; color: #1f77b4; margin-bottom: 2rem;'>מפת קשרים - תרומות ואלמנות</h1>", unsafe_allow_html=True)
-            st.write("מפה אינטראקטיבית המציגה את הקשרים בין התורמים והאלמנות עם גודל התרומה בכל חודש")
+            st.write("מפה אינטראקטיבית: כל אלמנה מחוברת רק לתורם האחרון שמופיע בעמודת 'תורם' שלה, עם סכום התרומה האחרונה (אם קיימת).")
             
             # יצירת גרף קשרים
             net = Network(height="600px", width="100%", bgcolor="#f8f9fa", font_color="#222")
@@ -1379,40 +1382,55 @@ def main():
             for widow in widows:
                 net.add_node(f"widow_{widow}", label=widow, color="#e45756", shape="box", size=20)
 
-            # יצירת קשרים עם גודל התרומה
-            for donor in donors:
-                # קבלת כל התרומות של התורם
-                donor_donations = donations_df[donations_df['שם'] == donor]
+            # חיבור כל אלמנה רק לתורם שמופיע בעמודת 'תורם'
+            connections_count = 0
+            missing_donors = set()  # Track missing donors for debugging
+            
+            for _, widow_row in almanot_df.iterrows():
+                widow_name = widow_row['שם ']
+                donor_name = widow_row['תורם'] if 'תורם' in widow_row and pd.notna(widow_row['תורם']) else None
                 
-                for widow in widows:
-                    # חישוב סך התרומות של התורם (במקום קשר ישיר)
-                    total_donation = donor_donations['שקלים'].sum()
+                if donor_name and donor_name.strip():
+                    # בדוק שהתורם קיים ברשימת התורמים
+                    if donor_name not in donors:
+                        missing_donors.add(donor_name)
+                        continue  # דלג על תורמים שלא קיימים
                     
-                    # המרה לאלפי שקלים
-                    donation_k = total_donation / 1000
-                    
-                    # קביעת עובי הקשת לפי גודל התרומה
-                    edge_width = max(1, min(10, donation_k / 10))  # בין 1 ל-10
-                    
-                    # קביעת צבע הקשת לפי גודל התרומה
-                    if donation_k > 50:
-                        edge_color = "#2E8B57"  # ירוק כהה לתרומות גדולות
-                    elif donation_k > 20:
-                        edge_color = "#32CD32"  # ירוק לתרומות בינוניות
-                    elif donation_k > 10:
-                        edge_color = "#FFD700"  # צהוב לתרומות קטנות
+                    # חפש את התרומה האחרונה של התורם הזה
+                    donor_donations = donations_df[donations_df['שם'] == donor_name]
+                    if not donor_donations.empty:
+                        last_row = donor_donations.sort_values('תאריך', ascending=False).iloc[0]
+                        last_amount = last_row['שקלים'] if 'שקלים' in last_row else 0
+                        last_date = last_row['תאריך'] if 'תאריך' in last_row else None
                     else:
-                        edge_color = "#D3D3D3"  # אפור לתרומות קטנות מאוד
+                        last_amount = 0
+                        last_date = None
                     
-                    # הוספת הקשת עם התווית
+                    donation_k = last_amount / 1000
+                    edge_width = max(1, min(6, donation_k / 10))
+                    
+                    if donation_k > 50:
+                        edge_color = "#2E8B57"
+                    elif donation_k > 20:
+                        edge_color = "#32CD32"
+                    elif donation_k > 10:
+                        edge_color = "#FFD700"
+                    else:
+                        edge_color = "#D3D3D3"
+                    
                     net.add_edge(
-                        f"donor_{donor}", 
-                        f"widow_{widow}", 
-                        color=edge_color, 
+                        f"donor_{donor_name}",
+                        f"widow_{widow_name}",
+                        color=edge_color,
                         width=edge_width,
-                        title=f"{donor} → {widow}: {donation_k:.1f}k ₪"
+                        title=f"{donor_name} → {widow_name}: {donation_k:.1f}k ₪" + (f" ({last_date.strftime('%d/%m/%Y')})" if last_date is not None and pd.notna(last_date) else "")
                     )
-
+                    connections_count += 1
+            
+            # הצג אזהרה על תורמים חסרים
+            if missing_donors:
+                st.warning(f"⚠️ **אזהרה**: התורמים הבאים מופיעים בעמודת 'תורם' אך לא נמצאו ברשימת התרומות: {', '.join(missing_donors)}")
+            
             # הגדרות נוספות לגרף
             net.set_options("""
             var options = {
@@ -1451,6 +1469,9 @@ def main():
                 html_content = open(tmp_file.name, 'r', encoding='utf-8').read()
                 components.html(html_content, height=650, scrolling=True)
             
+            # מידע על הגרף
+            st.info(f"📊 **מידע על הגרף**: מוצגים {connections_count} קשרים מתוך {len(donors)} תורמים ו-{len(widows)} אלמנות")
+            
             # הסבר על הצבעים
             st.markdown("### הסבר על הצבעים:")
             col1, col2, col3, col4 = st.columns(4)
@@ -1463,7 +1484,7 @@ def main():
             with col4:
                 st.markdown("⚪ **אפור**: תרומות מתחת ל-10k ₪")
             
-            st.info("💡 **טיפ**: העבר את העכבר מעל הקשתות כדי לראות את גודל התרומה המדויק")
+            st.info("💡 **טיפ**: העבר את העכבר מעל הקשתות כדי לראות את גודל התרומה המדויק.")
         
     except Exception as e:
         logging.error(f"Error in main function: {str(e)}")
