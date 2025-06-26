@@ -96,15 +96,24 @@ def calculate_monthly_budget(expenses_df: pd.DataFrame, donations_df: pd.DataFra
         # Calculate coverage ratio
         coverage_ratio = (total_donations / total_expenses * 100) if total_expenses > 0 else 0
         
-        # Determine status
-        if coverage_ratio >= 100:
-            status = "מצוין"
-        elif coverage_ratio >= 80:
-            status = "טוב"
-        elif coverage_ratio >= 60:
-            status = "מספק"
+        # Determine status based on balance (surplus/deficit) instead of coverage ratio
+        if balance >= 0:
+            # Surplus or balanced
+            if balance >= total_expenses * 0.2:  # 20% surplus
+                status = "מצוין"
+            elif balance >= total_expenses * 0.1:  # 10% surplus
+                status = "טוב"
+            else:
+                status = "מספק"
         else:
-            status = "דורש תשומת לב"
+            # Deficit
+            deficit_ratio = abs(balance) / total_expenses if total_expenses > 0 else 0
+            if deficit_ratio <= 0.1:  # Deficit up to 10%
+                status = "דורש תשומת לב"
+            elif deficit_ratio <= 0.25:  # Deficit up to 25%
+                status = "קריטי"
+            else:  # Deficit over 25%
+                status = "מצב חירום"
             
         return {
             'total_expenses': total_expenses,

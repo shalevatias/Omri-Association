@@ -45,7 +45,6 @@ import streamlit.components.v1 as components
 from streamlit_agraph import agraph, Node, Edge, Config
 import tempfile
 import json
-import re
 
 # Configure logging
 logging.basicConfig(
@@ -576,74 +575,6 @@ def save_widows_data(almanot_df):
     except Exception as e:
         st.error(f"שגיאה בשמירת נתוני אלמנות: {str(e)}")
 
-def get_edge_color(amount):
-    """מחזיר צבע קשר לפי סכום התרומה"""
-    if amount == 1000:
-        return "#fbbf24"  # צהוב
-    elif amount == 2000:
-        return "#3b82f6"  # כחול
-    else:
-        return "#9ca3af"  # אפור
-
-def extract_amount_from_title(title):
-    """מחלץ סכום מתיאור הקשר"""
-    try:
-        # מחפש תבנית כמו "1.0k ₪" או "2.0k ₪"
-        import re
-        match = re.search(r'(\d+\.?\d*)k', title)
-        if match:
-            return int(float(match.group(1)) * 1000)
-        return 1000  # ברירת מחדל
-    except:
-        return 1000
-
-def update_connection_in_data(donor_name, widow_name, amount):
-    """מעדכן קשר בקבצי הנתונים"""
-    try:
-        # טעינת הנתונים הנוכחיים
-        almanot_df = pd.read_excel('almanot.xlsx')
-        
-        # עדכון התורם והסכום באלמנה
-        almanot_df.loc[almanot_df['שם '] == widow_name, 'תורם'] = donor_name
-        almanot_df.loc[almanot_df['שם '] == widow_name, 'סכום חודשי'] = amount
-        
-        # שמירת הנתונים
-        almanot_df.to_excel('almanot.xlsx', index=False)
-        
-        # הוספת תרומה חדשה לקובץ התרומות
-        donations_df = pd.read_excel('omri.xlsx')
-        new_donation = {
-            'תאריך': pd.Timestamp.now(),
-            'שם': donor_name,
-            'שקלים': amount,
-            'הערות': f'תרומה חודשית ל{widow_name}'
-        }
-        donations_df = pd.concat([donations_df, pd.DataFrame([new_donation])], ignore_index=True)
-        donations_df.to_excel('omri.xlsx', index=False)
-        
-        return True
-    except Exception as e:
-        st.error(f"שגיאה בעדכון הנתונים: {str(e)}")
-        return False
-
-def remove_connection_from_data(donor_name, widow_name):
-    """מסיר קשר מקבצי הנתונים"""
-    try:
-        # טעינת הנתונים הנוכחיים
-        almanot_df = pd.read_excel('almanot.xlsx')
-        
-        # הסרת התורם מהאלמנה
-        almanot_df.loc[almanot_df['שם '] == widow_name, 'תורם'] = None
-        almanot_df.loc[almanot_df['שם '] == widow_name, 'סכום חודשי'] = 0
-        
-        # שמירת הנתונים
-        almanot_df.to_excel('almanot.xlsx', index=False)
-        
-        return True
-    except Exception as e:
-        st.error(f"שגיאה בהסרת הקשר: {str(e)}")
-        return False
-
 def main():
     try:
         st.markdown("<h1 style='text-align: center; color: #1f77b4; margin-bottom: 2rem;'>מערכת ניהול עמותת עמרי</h1>", unsafe_allow_html=True)
@@ -822,7 +753,9 @@ def main():
             with col1:
                 create_monthly_trends(expenses_df, donations_df)
             with col2:
-                create_comparison_chart(expenses_df, donations_df)
+                # הסרת הגרף הכפול - הוא כבר מופיע בדף הבית
+                # create_comparison_chart(expenses_df, donations_df)
+                st.info("הגרף 'השוואת הוצאות ותרומות' מופיע בדף הבית")
             
             # Add spacing
             st.markdown("<div style='margin: 2rem 0;'></div>", unsafe_allow_html=True)
@@ -895,12 +828,9 @@ def main():
             
             # Display budget status indicator
             status_color = {
-                "מצוין": "#10b981",  # Green
-                "טוב": "#3b82f6",    # Blue
-                "מספק": "#f59e0b",   # Orange
-                "דורש תשומת לב": "#ef4444",  # Red
-                "קריטי": "#dc2626",  # Dark red
-                "מצב חירום": "#991b1b"  # Very dark red
+                "עודף": "green",
+                "מאוזן": "blue",
+                "גירעון": "red"
             }.get(budget_status['status'], "gray")
             
             st.markdown(f"""
@@ -918,48 +848,17 @@ def main():
             
             col1, col2 = st.columns(2)
             with col1:
-                # Custom metric for expenses with correct icon and color
-                expenses_change = trends['expenses_change']
-                expenses_trend = trends['expenses_trend']
-                
-                if expenses_trend == "עולה":
-                    icon = "📈"
-                    color = "#ef4444"  # Red for increasing expenses
-                else:
-                    icon = "📉"
-                    color = "#10b981"  # Green for decreasing expenses
-                
-                st.markdown(f"""
-                <div style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; background-color: white;">
-                    <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">שינוי בהוצאות</div>
-                    <div style="font-size: 2rem; font-weight: bold; color: {color}; margin-bottom: 0.5rem;">
-                        {icon} {expenses_change:.1f}%
-                    </div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">מגמה: {expenses_trend}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
+                st.metric(
+                    "שינוי בהוצאות",
+                    f"{trends['expenses_change']:.1f}%",
+                    f"מגמה: {trends['expenses_trend']}"
+                )
             with col2:
-                # Custom metric for donations with correct icon and color
-                donations_change = trends['donations_change']
-                donations_trend = trends['donations_trend']
-                
-                if donations_trend == "עולה":
-                    icon = "📈"
-                    color = "#10b981"  # Green for increasing donations
-                else:
-                    icon = "📉"
-                    color = "#ef4444"  # Red for decreasing donations
-                
-                st.markdown(f"""
-                <div style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; background-color: white;">
-                    <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">שינוי בתרומות</div>
-                    <div style="font-size: 2rem; font-weight: bold; color: {color}; margin-bottom: 0.5rem;">
-                        {icon} {donations_change:.1f}%
-                    </div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">מגמה: {donations_trend}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric(
+                    "שינוי בתרומות",
+                    f"{trends['donations_change']:.1f}%",
+                    f"מגמה: {trends['donations_trend']}"
+                )
             
             # Monthly Comparison
             st.markdown("<h2 style='color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;'>השוואה חודשית</h2>", unsafe_allow_html=True)
@@ -998,6 +897,7 @@ def main():
             with col2:
                 # Show donation statistics
                 st.markdown("<h3 style='color: #4b5563; margin-bottom: 1rem;'>סטטיסטיקות תרומות</h3>", unsafe_allow_html=True)
+                st.write(f"**תרומה ממוצעת:** ₪{donations_df['שקלים'].mean():,.0f}")
                 st.write(f"**תרומה מקסימלית:** ₪{donations_df['שקלים'].max():,.0f}")
                 st.write(f"**תרומה מינימלית:** ₪{donations_df['שקלים'].min():,.0f}")
                 st.write(f"**חציון:** ₪{donations_df['שקלים'].median():,.0f}")
@@ -1008,7 +908,9 @@ def main():
             with col1:
                 create_monthly_trends(expenses_df, donations_df)
             with col2:
-                create_comparison_chart(expenses_df, donations_df)
+                # הסרת הגרף הכפול - הוא כבר מופיע בדף הבית
+                # create_comparison_chart(expenses_df, donations_df)
+                st.info("הגרף 'השוואת הוצאות ותרומות' מופיע בדף הבית")
             
             # Add spacing
             st.markdown("<div style='margin: 2rem 0;'></div>", unsafe_allow_html=True)
@@ -1661,18 +1563,12 @@ def main():
                         donor_connections[donor_name] = 0
                     donor_connections[donor_name] += 1
                 
-                # בדיקה אילו תורמים יש להם תרומות בפועל
-                donors_with_actual_donations = set(donations_df_clean['שם'].unique())
-                
-                # זיהוי תורמים עם קשרים (רק כאלה שיש להם תרומות בפועל)
+                # זיהוי תורמים עם קשרים
                 donors_with_connections = set(donor_connections.keys()) - {'nan'}
-                donors_with_connections = donors_with_connections.intersection(donors_with_actual_donations)
                 donors_without_connections = set(donors) - donors_with_connections
                 
-                print(f"DEBUG: Donors with actual donations: {len(donors_with_actual_donations)}")
                 print(f"DEBUG: Donors with connections: {len(donors_with_connections)}")
                 print(f"DEBUG: Donors without connections: {len(donors_without_connections)}")
-                print(f"DEBUG: Donors in mapping but no actual donations: {set(donor_connections.keys()) - {'nan'} - donors_with_actual_donations}")
                 
                 # יצירת מיפוי של מספר חיבורים לגודל צומת
                 connection_size_mapping = {}
@@ -1746,20 +1642,8 @@ def main():
                 widows_with_connections = set(widow_to_donor_mapping.keys())
                 widows_without_connections = set(widows) - widows_with_connections
                 
-                # בדיקה אילו אלמנות יש להן קשרים בפועל (רק אם התורם קיים בפועל)
-                actual_widows_with_connections = set()
-                for widow_name, donor_name in widow_to_donor_mapping.items():
-                    if donor_name in donors_with_actual_donations:
-                        actual_widows_with_connections.add(widow_name)
-                
-                widows_with_connections = actual_widows_with_connections
-                widows_without_connections = set(widows) - widows_with_connections
-                
                 print(f"DEBUG: Widows with connections: {len(widows_with_connections)}")
                 print(f"DEBUG: Widows without connections: {len(widows_without_connections)}")
-                print(f"DEBUG: Widows with actual connections: {len(widows_with_connections)}")
-                print(f"DEBUG: Widows without actual connections: {len(widows_without_connections)}")
-                print(f"DEBUG: Widows in mapping but no actual connections: {set(widow_to_donor_mapping.keys()) - actual_widows_with_connections}")
                 
                 # הוספת אלמנות עם קשרים מימין
                 right_x = 600
@@ -1799,14 +1683,6 @@ def main():
                         )
                     )
                 
-                # הדפסת כל הצמתים שנוצרים
-                print("DEBUG: Nodes created:")
-                for node in nodes:
-                    warn = ""
-                    if not node.label or str(node.label).strip() == "" or str(node.label).lower() == "nan" or str(node.label).startswith("קשר"):
-                        warn = " <== WARNING: suspicious label!"
-                    print(f"  id={node.id}, label={node.label!r}, shape={node.shape}, color={node.color}{warn}")
-                
                 # יצירת הקשרים
                 for i, widow_row in real_widows_df.iterrows():
                     widow_name = widow_row['שם ']
@@ -1845,368 +1721,3 @@ def main():
                             print(f"DEBUG: Donor '{donor_name}' not found in donations data")
                         if widow_name not in widow_nodes:
                             print(f"DEBUG: Widow '{widow_name}' not found in widows data")
-                
-                # הדפסת מידע על חיבורים וגודל צמתים (לבדיקה)
-                print(f"DEBUG: Connection size mapping: {connection_size_mapping}")
-                print(f"DEBUG: Donor connections: {donor_connections}")
-                
-                # --- חיפוש ידני מעל הגרף ---
-                all_names = list(donors) + list(widows)
-                selected_name = st.selectbox("חפש תורם/אלמנה להדגשה בגרף", options=["בחר שם להדגשה..."] + sorted(all_names), index=0)
-                
-                # הדגשת הצומת שנבחרה
-                if selected_name != "בחר שם להדגשה...":
-                    for node in nodes:
-                        if node.label == selected_name:
-                            node.color = highlight_color
-                            node.size = node.size + 5
-                            break
-                    st.info(f"🔎 בחרת להדגיש את: {selected_name}. הצומת מודגשת בצבע סגול.")
-                
-                # הגדרת תצורת הגרף
-                config = Config(
-                    height=800,
-                    width=1200,
-                    directed=True,
-                    physics=True,
-                    hierarchical=False,
-                    nodeHighlightBehavior=True,
-                    highlightNearest=True,
-                    collapsible=False,
-                    node={'labelProperty': 'label'},
-                    link={'labelProperty': 'label', 'renderLabel': True},
-                    d3={'gravity': -100, 'linkLength': 100},
-                    stabilization=True,
-                    fit=True,
-                    # הוספת פונקציונליות עריכה
-                    manipulation={
-                        'enabled': True,
-                        'initiallyActive': False,
-                        'addNode': False,  # לא מאפשר יצירת צמתים חדשים
-                        'addEdge': True,
-                        'editNode': False,  # לא מאפשר עריכת צמתים
-                        'editEdge': True,
-                        'deleteNode': False,  # לא מאפשר מחיקת צמתים
-                        'deleteEdge': True,
-                        'controlNodeStyle': {
-                            'shape': 'circle',
-                            'size': 20,
-                            'color': {'background': '#4ade80', 'border': '#22c55e'},
-                            'font': {'color': '#ffffff', 'size': 12}
-                        }
-                    }
-                )
-                
-                # הצגת הגרף
-                agraph(nodes=nodes, edges=edges, config=config)
-                
-                # כפתור להפעלת/כיבוי מצב עריכה
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    edit_mode = st.toggle("✏️ מצב עריכה", key="edit_mode_toggle")
-                    if edit_mode:
-                        st.info("🔧 **מצב עריכה פעיל**: גרור צמתים ליצירת קשרים חדשים, לחץ על קשרים לעריכה, או לחץ על צמתים למחיקה.")
-                    else:
-                        st.info("👆 **מצב צפייה**: לחץ על צמתים וקשרים לפרטים נוספים.")
-                
-                # כפתורי פעולה מהירה במצב עריכה
-                if edit_mode:
-                    st.markdown("### ⚡ פעולות מהירות")
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        if st.button("🔄 רענן גרף", key="refresh_graph"):
-                            st.rerun()
-                    
-                    with col2:
-                        if st.button("💾 שמור שינויים", key="save_changes"):
-                            # שמירת כל השינויים הזמניים
-                            if 'temp_changes' in st.session_state and st.session_state.temp_changes:
-                                for change in st.session_state.temp_changes:
-                                    if change['action'] == 'add':
-                                        update_connection_in_data(change['donor'], change['widow'], change['amount'])
-                                    elif change['action'] == 'edit':
-                                        update_connection_in_data(change['donor'], change['widow'], change['amount'])
-                                    elif change['action'] == 'delete':
-                                        remove_connection_from_data(change['donor'], change['widow'])
-                                
-                                # ניקוי השינויים הזמניים
-                                st.session_state.temp_changes = []
-                                st.success("✅ כל השינויים נשמרו בהצלחה!")
-                                st.rerun()
-                            else:
-                                st.info("ℹ️ אין שינויים לשמירה")
-                    
-                    with col3:
-                        if st.button("📊 סטטיסטיקות", key="show_stats"):
-                            pending_changes = len(st.session_state.get('temp_changes', []))
-                            st.info(f"📈 **סטטיסטיקות נוכחיות**: {len(donors)} תורמים, {len(widows)} אלמנות, {len(edges)} קשרים פעילים, {pending_changes} שינויים ממתינים")
-                    
-                    with col4:
-                        if st.button("❌ ביטול עריכה", key="cancel_edit"):
-                            # ביטול כל השינויים הזמניים
-                            if 'temp_changes' in st.session_state:
-                                del st.session_state.temp_changes
-                            st.session_state.edit_mode_toggle = False
-                            st.rerun()
-                
-                # הוראות שימוש
-                with st.expander("📖 הוראות שימוש במערכת העריכה"):
-                    st.markdown("""
-                    ### איך לערוך קשרים ישירות על הגרף:
-                    
-                    **🔧 מצב עריכה:**
-                    1. **הפעל את כפתור "מצב עריכה"** למעלה
-                    2. **גרור צמתים** - גרור תורם לאלמנה ליצירת קשר חדש
-                    3. **לחץ על קשרים** - לעריכת סכום התרומה
-                    4. **הדגשת אלמנות זמינות** - אלמנות ללא תורם יודגשו בצבע שונה
-                    
-                    **👆 מצב צפייה:**
-                    - לחץ על צמתים וקשרים לפרטים נוספים
-                    - השתמש בחיפוש למעלה להדגשת צמתים
-                    
-                    **💾 שמירה ידנית:**
-                    - השינויים נשמרים רק בלחיצה על "שמור שינויים"
-                    - השתמש ב"ביטול עריכה" לביטול כל השינויים
-                    - התרומות מתעדכנות ב-`omri.xlsx`
-                    - הקשרים מתעדכנים ב-`almanot.xlsx`
-                    
-                    **⚠️ הגבלות:**
-                    - לא ניתן ליצור צמתים חדשים
-                    - לא ניתן לחבר לאלמנה שכבר יש לה תורם
-                    - לא ניתן למחוק צמתים קיימים
-                    """)
-                
-                # JavaScript לטיפול באירועי עריכה
-                if edit_mode:
-                    st.markdown("""
-                    <script>
-                    // פונקציה לטיפול באירועי עריכה
-                    function setupGraphEditing() {
-                        // רשימת אלמנות עם תורמים (למניעת חיבורים כפולים)
-                        const widowsWithDonors = new Set();
-                        network.body.data.edges.forEach(edge => {
-                            if (edge.to.startsWith('widow_')) {
-                                widowsWithDonors.add(edge.to);
-                            }
-                        });
-                        
-                        // הדגשת אלמנות זמינות (ללא תורם)
-                        network.body.data.nodes.forEach(node => {
-                            if (node.id.startsWith('widow_') && !widowsWithDonors.has(node.id)) {
-                                // הדגשת אלמנות זמינות בצבע שונה
-                                node.color = '#10b981'; // צבע ירוק לאלמנות זמינות
-                                node.size = node.size + 5;
-                                network.body.data.nodes.update(node);
-                            }
-                        });
-                        
-                        // אירוע יצירת קשר חדש
-                        network.on('addEdge', function(data) {
-                            const fromNode = data.from;
-                            const toNode = data.to;
-                            
-                            // בדיקה שהקשר הוא בין תורם לאלמנה
-                            if (fromNode.startsWith('donor_') && toNode.startsWith('widow_')) {
-                                const donorName = fromNode.replace('donor_', '');
-                                const widowName = toNode.replace('widow_', '');
-                                
-                                // בדיקה שהאלמנה לא מחוברת כבר
-                                if (widowsWithDonors.has(toNode)) {
-                                    alert('אלמנה זו כבר מחוברת לתורם אחר!');
-                                    network.body.data.edges.remove(data.id);
-                                    return;
-                                }
-                                
-                                // הצגת דיאלוג לבחירת סכום
-                                const amount = prompt('בחר סכום התרומה (בשקלים):', '1000');
-                                if (amount && !isNaN(amount)) {
-                                    // עדכון הקשר עם הסכום החדש
-                                    const edge = network.body.data.edges.get(data.id);
-                                    if (edge) {
-                                        edge.title = donorName + ' → ' + widowName + ': ' + (amount/1000) + 'k ₪';
-                                        edge.color = amount >= 2000 ? '#3b82f6' : '#fbbf24';
-                                        edge.width = Math.max(1, Math.min(8, amount / 1000 / 10));
-                                        network.body.data.edges.update(edge);
-                                        
-                                        // עדכון צבע התורם לכחול (עם קשרים)
-                                        const donorNode = network.body.data.nodes.get(fromNode);
-                                        if (donorNode) {
-                                            donorNode.color = '#2563eb';
-                                            network.body.data.nodes.update(donorNode);
-                                        }
-                                        
-                                        // עדכון צבע האלמנה לאדום (עם קשרים)
-                                        const widowNode = network.body.data.nodes.get(toNode);
-                                        if (widowNode) {
-                                            widowNode.color = '#f43f5e';
-                                            widowNode.size = Math.max(20, widowNode.size - 5);
-                                            network.body.data.nodes.update(widowNode);
-                                        }
-                                        
-                                        // הוספה לרשימת אלמנות עם תורמים
-                                        widowsWithDonors.add(toNode);
-                                    }
-                                    
-                                    // שליחת הנתונים לשרת
-                                    fetch('/update_connection', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            donor: donorName,
-                                            widow: widowName,
-                                            amount: parseInt(amount),
-                                            action: 'add'
-                                        })
-                                    }).then(() => {
-                                        console.log('Connection updated successfully');
-                                    });
-                                } else {
-                                    // ביטול הקשר אם לא נבחר סכום
-                                    network.body.data.edges.remove(data.id);
-                                }
-                            }
-                        });
-                        
-                        // אירוע מחיקת קשר
-                        network.on('deleteEdge', function(data) {
-                            const edgeId = data.edges[0];
-                            const edge = network.body.data.edges.get(edgeId);
-                            
-                            if (edge) {
-                                const fromNode = edge.from;
-                                const toNode = edge.to;
-                                
-                                if (fromNode.startsWith('donor_') && toNode.startsWith('widow_')) {
-                                    const donorName = fromNode.replace('donor_', '');
-                                    const widowName = toNode.replace('widow_', '');
-                                    
-                                    if (confirm('האם אתה בטוח שברצונך למחוק את הקשר הזה?')) {
-                                        // הסרה מרשימת אלמנות עם תורמים
-                                        widowsWithDonors.delete(toNode);
-                                        
-                                        // עדכון צבע האלמנה לירוק (זמינה)
-                                        const widowNode = network.body.data.nodes.get(toNode);
-                                        if (widowNode) {
-                                            widowNode.color = '#10b981';
-                                            widowNode.size = widowNode.size + 5;
-                                            network.body.data.nodes.update(widowNode);
-                                        }
-                                        
-                                        fetch('/update_connection', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                            },
-                                            body: JSON.stringify({
-                                                donor: donorName,
-                                                widow: widowName,
-                                                action: 'delete'
-                                            })
-                                        }).then(() => {
-                                            console.log('Connection deleted successfully');
-                                        });
-                                    }
-                                }
-                            }
-                        });
-                        
-                        // אירוע עריכת קשר
-                        network.on('editEdge', function(data) {
-                            const edge = data.edge;
-                            const fromNode = edge.from;
-                            const toNode = edge.to;
-                            
-                            if (fromNode.startsWith('donor_') && toNode.startsWith('widow_')) {
-                                const donorName = fromNode.replace('donor_', '');
-                                const widowName = toNode.replace('widow_', '');
-                                
-                                const newAmount = prompt('ערוך סכום התרומה (בשקלים):', '1000');
-                                if (newAmount && !isNaN(newAmount)) {
-                                    edge.title = donorName + ' → ' + widowName + ': ' + (newAmount/1000) + 'k ₪';
-                                    edge.color = newAmount >= 2000 ? '#3b82f6' : '#fbbf24';
-                                    edge.width = Math.max(1, Math.min(8, newAmount / 1000 / 10));
-                                    network.body.data.edges.update(edge);
-                                    
-                                    fetch('/update_connection', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            donor: donorName,
-                                            widow: widowName,
-                                            amount: parseInt(newAmount),
-                                            action: 'edit'
-                                        })
-                                    }).then(() => {
-                                        console.log('Connection edited successfully');
-                                    });
-                                }
-                            }
-                        });
-                    }
-                    
-                    // הפעלת הפונקציה כשהדף נטען
-                    document.addEventListener('DOMContentLoaded', setupGraphEditing);
-                    </script>
-                    """, unsafe_allow_html=True)
-                
-                # טיפול בעדכוני קשרים
-                if 'pending_connection_update' in st.session_state:
-                    update_data = st.session_state.pending_connection_update
-                    donor_name = update_data.get('donor')
-                    widow_name = update_data.get('widow')
-                    action = update_data.get('action')
-                    amount = update_data.get('amount', 1000)
-                    
-                    if action == 'add':
-                        # הוספה לרשימת השינויים הזמניים
-                        if 'temp_changes' not in st.session_state:
-                            st.session_state.temp_changes = []
-                        st.session_state.temp_changes.append({
-                            'action': 'add',
-                            'donor': donor_name,
-                            'widow': widow_name,
-                            'amount': amount
-                        })
-                        st.success(f"✅ קשר חדש נוסף: {donor_name} → {widow_name} ({amount:,} ₪)")
-                    elif action == 'edit':
-                        # עדכון ברשימת השינויים הזמניים
-                        if 'temp_changes' not in st.session_state:
-                            st.session_state.temp_changes = []
-                        st.session_state.temp_changes.append({
-                            'action': 'edit',
-                            'donor': donor_name,
-                            'widow': widow_name,
-                            'amount': amount
-                        })
-                        st.success(f"✅ קשר עודכן: {donor_name} → {widow_name} ({amount:,} ₪)")
-                    elif action == 'delete':
-                        # הוספת מחיקה לרשימת השינויים הזמניים
-                        if 'temp_changes' not in st.session_state:
-                            st.session_state.temp_changes = []
-                        st.session_state.temp_changes.append({
-                            'action': 'delete',
-                            'donor': donor_name,
-                            'widow': widow_name
-                        })
-                        st.success(f"✅ קשר נמחק: {donor_name} → {widow_name}")
-                    
-                    # ניקוי הנתונים הזמניים
-                    del st.session_state.pending_connection_update
-                    st.rerun()
-            except Exception as e:
-                logging.error(f"Error creating network graph: {str(e)}")
-                logging.error(traceback.format_exc())
-                st.error("שגיאה ביצירת מפת הקשרים. אנא נסה שוב.")
-        
-    except Exception as e:
-        logging.error(f"Error in main function: {str(e)}")
-        logging.error(traceback.format_exc())
-        st.error("שגיאה בהצגת הדשבורד. אנא נסה לרענן את הדף.")
-
-if __name__ == "__main__":
-    main()

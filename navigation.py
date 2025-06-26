@@ -91,11 +91,12 @@ def show_home_page(expenses_df, donations_df, widows_df):
         st.subheader("מגמות חודשיות")
         create_monthly_trends(expenses_df, donations_df)
         
-        st.subheader("השוואת הוצאות ותרומות")
-        create_comparison_chart(expenses_df, donations_df)
+        # הסרת הגרפים הכפולים - הם כבר מופיעים ב-dashboard.py
+        # st.subheader("השוואת הוצאות ותרומות")
+        # create_comparison_chart(expenses_df, donations_df)
         
-        st.subheader("התפלגות תקציב")
-        create_budget_distribution_chart(expenses_df)
+        # st.subheader("התפלגות תקציב")
+        # create_budget_distribution_chart(expenses_df)
         
     except Exception as e:
         logging.error(f"Error in home page: {str(e)}")
@@ -136,7 +137,8 @@ def show_support_management_page(widows_df):
         
         # Display chart
         st.subheader("תמיכה באלמנות")
-        create_widows_support_chart(widows_df)
+        # הסרת הגרף הכפול - הוא כבר מופיע ב-dashboard.py
+        # create_widows_support_chart(widows_df)
         
         # Display data
         st.subheader("נתוני תמיכה")
@@ -181,7 +183,8 @@ def show_donations_management_page(donations_df):
         
         # Display chart
         st.subheader("תרומות לפי תורם")
-        create_donor_contribution_chart(donations_df)
+        # הסרת הגרף הכפול - הוא כבר מופיע ב-dashboard.py
+        # create_donor_contribution_chart(donations_df)
         
         # Display data
         st.subheader("נתוני תרומות")
@@ -226,7 +229,8 @@ def show_expenses_management_page(expenses_df):
         
         # Display chart
         st.subheader("התפלגות הוצאות")
-        create_budget_distribution_chart(expenses_df)
+        # הסרת הגרף הכפול - הוא כבר מופיע ב-dashboard.py
+        # create_budget_distribution_chart(expenses_df)
         
         # Display data
         st.subheader("נתוני הוצאות")
